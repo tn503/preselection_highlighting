@@ -100,7 +100,7 @@ def cursor_callback(context, xy):
                 ss.my_vector5 = f.edges[2].verts[0].co
                 ss.my_vector6 = f.edges[2].verts[1].co
                 
-                print(len(f.verts))
+                #print(len(f.verts))
                 if len(f.verts) == 4:
                     ss.my_selection = 'face'
                     ss.my_vector7 = f.edges[3].verts[0].co
