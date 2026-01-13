@@ -11,6 +11,8 @@ def update_mybool(self, context):
 
 class PreselectionOperatorSettings(bpy.types.PropertyGroup):
     my_bool: bpy.props.BoolProperty(default = False, update=update_mybool)
+    my_bool_count: bpy.props.BoolProperty(default = True)
+    my_interval: bpy.props.FloatProperty(default = 0.1, soft_min=0.0, soft_max = 1.0)
     
     my_selection: bpy.props.StringProperty(default = 'none')
     
@@ -61,82 +63,62 @@ def draw_callback(context):
         batch.draw(shader)
 
 def cursor_callback(context, xy):
+    ss = context.window_manager.PreselectionOperatorSettings
+    
+    if not ss.my_bool_count: return
+    ss.my_bool_count = False
+    
     xy = xy[0] - bpy.context.area.x, xy[1] - bpy.context.area.y
     
     if bpy.context.mode=='EDIT_MESH':
         obj = bpy.context.object
         bm = bmesh.from_edit_mesh(obj.data)
         
-        #store selection
-        selection = []
-        for v in bm.verts:
-            if v.select:
-                selection.append(v)
-        for e in bm.edges:
-            if e.select:
-                selection.append(e)
-        for f in bm.faces:
-            if f.select:
-                selection.append(f)
         #store active
+        select_history = bm.select_history[:]
         active = bm.select_history.active
         active_face = bm.faces.active
         
-        #(pre)select at mouse position        
-        bpy.ops.view3d.select(location=xy, deselect_all=True)
+        #(pre)select at mouse position
+        bpy.ops.view3d.select(location=xy)
         
-        ss = context.window_manager.PreselectionOperatorSettings
         #store (pre)selection coordinates and deselct
-        for f in bm.faces:
-            if f.select:
+        pre = bm.select_history.active
+        if pre:
+            if type(pre) == bmesh.types.BMVert:
+                ss.my_selection = 'vert'
+                ss.my_vector1 = pre.co
+            elif type(pre) == bmesh.types.BMEdge:
+                ss.my_selection = 'edge'
+                ss.my_vector1 = pre.verts[0].co
+                ss.my_vector2 = pre.verts[1].co
+            elif type(pre) == bmesh.types.BMFace:
                 ss.my_selection = 'triangle'
                 
-                ss.my_vector1 = f.edges[0].verts[0].co
-                ss.my_vector2 = f.edges[0].verts[1].co
+                ss.my_vector1 = pre.edges[0].verts[0].co
+                ss.my_vector2 = pre.edges[0].verts[1].co
                 
-                ss.my_vector3 = f.edges[1].verts[0].co
-                ss.my_vector4 = f.edges[1].verts[1].co
+                ss.my_vector3 = pre.edges[1].verts[0].co
+                ss.my_vector4 = pre.edges[1].verts[1].co
                 
-                ss.my_vector5 = f.edges[2].verts[0].co
-                ss.my_vector6 = f.edges[2].verts[1].co
+                ss.my_vector5 = pre.edges[2].verts[0].co
+                ss.my_vector6 = pre.edges[2].verts[1].co
                 
-                #print(len(f.verts))
-                if len(f.verts) == 4:
+                if len(pre.verts) == 4:
                     ss.my_selection = 'face'
-                    ss.my_vector7 = f.edges[3].verts[0].co
-                    ss.my_vector8 = f.edges[3].verts[1].co
-                
-                f.select = False
-                bm.select_history.remove(f)
-                break
+                    ss.my_vector7 = pre.edges[3].verts[0].co
+                    ss.my_vector8 = pre.edges[3].verts[1].co
+            
+            pre.select = False
+            bm.select_history.remove(pre)
         else:
-            for e in bm.edges:
-                if e.select:
-                    ss.my_selection = 'edge'
-                    
-                    ss.my_vector1 = e.verts[0].co
-                    ss.my_vector2 = e.verts[1].co
-                    
-                    e.select = False
-                    bm.select_history.remove(e)
-                    break
-            else:
-                for v in bm.verts:
-                    if v.select:
-                        
-                        ss.my_selection = 'vert'
-                        ss.my_vector1 = v.co
-                        
-                        v.select = False
-                        bm.select_history.remove(v)
-                        
-                        break
-                else:
-                    ss.my_selection = 'none'
-                    
+            ss.my_selection = 'none'
+        
         #recovery selection
-        for i in selection:
+        for i in select_history:
             i.select = True
+            bm.select_history.add(i)
+        
         #recovery active
         if active:
             bm.select_history.add(active)
@@ -145,7 +127,12 @@ def cursor_callback(context, xy):
 
         bmesh.update_edit_mesh(obj.data)
         
-    
+
+def timer_callback():
+    ss = bpy.context.window_manager.PreselectionOperatorSettings
+    ss.my_bool_count = True
+    return ss.my_interval
+
 class PreselectionOperator(bpy.types.Operator):
     """Preselction Highlighting Operator"""
     bl_idname = "object.preselection_operator"
@@ -153,6 +140,7 @@ class PreselectionOperator(bpy.types.Operator):
 
     added_handler = False
     added_draw_handler = False
+    timer = False
     
     @classmethod
     def poll(cls, context):
@@ -164,6 +152,7 @@ class PreselectionOperator(bpy.types.Operator):
         if type(self).added_handler:
             context.window_manager.draw_cursor_remove(type(self).added_handler)
             bpy.types.SpaceView3D.draw_handler_remove(type(self).added_draw_handler, 'WINDOW')
+            bpy.app.timers.unregister(timer_callback)
             
             type(self).added_handler = False
             type(self).added_draw_handler = False
@@ -175,7 +164,8 @@ class PreselectionOperator(bpy.types.Operator):
             type(self).added_handler = context.window_manager.draw_cursor_add(cursor_callback, args, 'VIEW_3D', 'WINDOW')
             type(self).added_draw_handler = bpy.types.SpaceView3D.draw_handler_add(draw_callback, args, 'WINDOW', 'POST_VIEW')
             
-            bpy.context.area.tag_redraw()
+            bpy.app.timers.register(timer_callback)
+            
             self.report({'INFO'}, "Preselection highlighting add-on handlers add")
         
         return {'FINISHED'}
@@ -183,6 +173,7 @@ class PreselectionOperator(bpy.types.Operator):
 
 def menu_func(self, context):
     self.layout.prop(context.window_manager.PreselectionOperatorSettings, 'my_bool', text = 'Preselection', toggle=1)
+    self.layout.prop(context.window_manager.PreselectionOperatorSettings, 'my_interval', text = 'Interval')
 
 def register():    
     for f in bpy.types.VIEW3D_HT_header._dyn_ui_initialize():
@@ -195,14 +186,13 @@ def register():
     bpy.types.WindowManager.PreselectionOperatorSettings = bpy.props.PointerProperty(type=PreselectionOperatorSettings)
         
     bpy.types.VIEW3D_HT_header.append(menu_func)
-    
-    
+    #bpy.types.VIEW3D_HT_header.prepend(menu_func)
+        
 def unregister():
     bpy.utils.unregister_class(PreselectionOperator)
     bpy.utils.unregister_class(PreselectionOperatorSettings)
     
     bpy.types.VIEW3D_HT_header.remove(menu_func)
-
 
 if __name__ == "__main__":
     register()
