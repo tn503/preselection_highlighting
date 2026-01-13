@@ -5,5 +5,9 @@ does not support Ctrl+Click.
 
 ## Usage:
 1. Download op_preselection.py.
-2. Install from Disk.
+2. Install from Disk...
 3. Push [Preselection] button in SpaceView3D header.
+
+## Update:
+January 13th, 2026.
+* Add Interval value for execute preselection.
