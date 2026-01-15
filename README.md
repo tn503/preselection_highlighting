@@ -11,5 +11,6 @@ does not support Ctrl+Click.
 ## Update:
 January 15th, 2026.
 * Fix incomplete selection restore.
+
 January 13th, 2026.
 * Add Interval value for execute preselection.
