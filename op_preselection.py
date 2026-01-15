@@ -74,6 +74,19 @@ def cursor_callback(context, xy):
         obj = bpy.context.object
         bm = bmesh.from_edit_mesh(obj.data)
         
+        
+        #store selection
+        selection = []
+        for v in bm.verts:
+            if v.select:
+                selection.append(v)
+        for e in bm.edges:
+            if e.select:
+                selection.append(e)
+        for f in bm.faces:
+            if f.select:
+                selection.append(f)
+        
         #store active
         select_history = bm.select_history[:]
         active = bm.select_history.active
@@ -115,9 +128,8 @@ def cursor_callback(context, xy):
             ss.my_selection = 'none'
         
         #recovery selection
-        for i in select_history:
+        for i in selection:
             i.select = True
-            bm.select_history.add(i)
         
         #recovery active
         if active:
