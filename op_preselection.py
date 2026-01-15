@@ -62,6 +62,31 @@ def draw_callback(context):
             
         batch.draw(shader)
 
+def store_coordinates(ss, pre):
+    if type(pre) == bmesh.types.BMVert:
+        ss.my_selection = 'vert'
+        ss.my_vector1 = pre.co
+    elif type(pre) == bmesh.types.BMEdge:
+        ss.my_selection = 'edge'
+        ss.my_vector1 = pre.verts[0].co
+        ss.my_vector2 = pre.verts[1].co
+    elif type(pre) == bmesh.types.BMFace:
+        ss.my_selection = 'triangle'
+        
+        ss.my_vector1 = pre.edges[0].verts[0].co
+        ss.my_vector2 = pre.edges[0].verts[1].co
+        
+        ss.my_vector3 = pre.edges[1].verts[0].co
+        ss.my_vector4 = pre.edges[1].verts[1].co
+        
+        ss.my_vector5 = pre.edges[2].verts[0].co
+        ss.my_vector6 = pre.edges[2].verts[1].co
+        
+        if len(pre.verts) == 4:
+            ss.my_selection = 'face'
+            ss.my_vector7 = pre.edges[3].verts[0].co
+            ss.my_vector8 = pre.edges[3].verts[1].co
+
 def cursor_callback(context, xy):
     ss = context.window_manager.PreselectionOperatorSettings
     
@@ -73,7 +98,6 @@ def cursor_callback(context, xy):
     if bpy.context.mode=='EDIT_MESH':
         obj = bpy.context.object
         bm = bmesh.from_edit_mesh(obj.data)
-        
         
         #store selection
         selection = []
@@ -88,56 +112,42 @@ def cursor_callback(context, xy):
                 selection.append(f)
         
         #store active
-        select_history = bm.select_history[:]
         active = bm.select_history.active
         active_face = bm.faces.active
         
         #(pre)select at mouse position
-        bpy.ops.view3d.select(location=xy)
+        bpy.ops.view3d.select(location=xy, extend=True)
+        pre = bm.select_history.active
+        bpy.ops.view3d.select(location=xy, deselect=True)
         
         #store (pre)selection coordinates and deselct
-        pre = bm.select_history.active
         if pre:
-            if type(pre) == bmesh.types.BMVert:
-                ss.my_selection = 'vert'
-                ss.my_vector1 = pre.co
-            elif type(pre) == bmesh.types.BMEdge:
-                ss.my_selection = 'edge'
-                ss.my_vector1 = pre.verts[0].co
-                ss.my_vector2 = pre.verts[1].co
-            elif type(pre) == bmesh.types.BMFace:
-                ss.my_selection = 'triangle'
-                
-                ss.my_vector1 = pre.edges[0].verts[0].co
-                ss.my_vector2 = pre.edges[0].verts[1].co
-                
-                ss.my_vector3 = pre.edges[1].verts[0].co
-                ss.my_vector4 = pre.edges[1].verts[1].co
-                
-                ss.my_vector5 = pre.edges[2].verts[0].co
-                ss.my_vector6 = pre.edges[2].verts[1].co
-                
-                if len(pre.verts) == 4:
-                    ss.my_selection = 'face'
-                    ss.my_vector7 = pre.edges[3].verts[0].co
-                    ss.my_vector8 = pre.edges[3].verts[1].co
-            
-            pre.select = False
-            bm.select_history.remove(pre)
+            store_coordinates(ss, pre)
         else:
             ss.my_selection = 'none'
         
         #recovery selection
+        change = False
         for i in selection:
-            i.select = True
+            if not i.select:
+                i.select = True
+                change = True
         
         #recovery active
         if active:
-            bm.select_history.add(active)
-        if active_face:
-            bm.faces.active = active_face
+            if bm.select_history.active != active:
+                bm.select_history.add(active)
+                change = True
 
-        bmesh.update_edit_mesh(obj.data)
+        if active_face:
+            if bm.faces.active != active_face:
+                bm.faces.active = active_face
+                change = True
+
+        if change:
+            bmesh.update_edit_mesh(obj.data)###
+        else:
+            bpy.context.area.tag_redraw()
         
 
 def timer_callback():
