@@ -9,5 +9,7 @@ does not support Ctrl+Click.
 3. Push [Preselection] button in SpaceView3D header.
 
 ## Update:
+January 15th, 2026.
+* Fix incomplete selection restore.
 January 13th, 2026.
 * Add Interval value for execute preselection.
