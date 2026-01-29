@@ -1,6 +1,7 @@
 # Blender mesh editmode preselection highlighting add-on.
 Using only blender python API.
 
+* Does not support Object Transform.
 * Does not support X-ray mode.
 * Does not support Ngon.
 * Does not support Ctrl+Click.
